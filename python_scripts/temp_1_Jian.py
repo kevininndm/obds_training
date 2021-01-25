@@ -37,7 +37,7 @@ for i in range (-10,0):
     
 # Exercise 4
 n = int (input ('Enter a number : '))
-Sum = 0
+add = 0
 for n in range (0, n+1, 1):
-    sum = Sum + n
-print ("Sum of first", n, "numbers is:" Sum)
+    add = add + n
+print ("Sum of first", n, "numbers is:", add)
