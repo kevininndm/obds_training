@@ -36,6 +36,8 @@ for i in range (-10,0):
     print (i)
     
 # Exercise 4
-n = input ('Enter a number : ')
-x = sum (1,n)
-print (x)
+n = int (input ('Enter a number : '))
+Sum = 0
+for n in range (0, n+1, 1):
+    sum = Sum + n
+print ("Sum of first", n, "numbers is:" Sum)
