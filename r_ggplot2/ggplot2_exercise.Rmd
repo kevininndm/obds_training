@@ -76,7 +76,8 @@ plot2_scatter <- ggplot(ChickWeight,aes(x=Time,y=weight,color=Diet))+
   geom_smooth(method = 'lm')+
   labs(title = 'Scatter plot of chick weight over time',y='chick weight')+
   theme(axis.title = element_text(size = 15,face = 'bold'),
-        axis.text = element_text(size=10))
+        axis.text = element_text(size=10))+
+  scale_color_manual(values = c('1'='blue','2'='red','4'='orange','3'='green')) # Use scale_color_manual() to manually create the color
 print(plot2_scatter)
 ```
 
@@ -103,5 +104,19 @@ library(cowplot)
 plot_grid(plot1_histogram,plot2_scatter,labels = c('A','B'), ncol=2, nrow=1)
 ```
 
-
+Exercise 4
+Use RColorBrewer to manually specify the color
+```{r}
+ggplot(ChickWeight,aes(x=weight))+
+  geom_histogram(aes(fill=Diet),color='black',bins=50)+
+  scale_fill_brewer(palette = 'RdYlGn')+ # This is the use the color code from the RColorBrwer
+  labs(title='histogram of chick weight',
+       x='chick weight',
+       y='number of chicks',
+       subtitle = 'chick weight dataset by Diet')+
+  theme(axis.title = element_text(size=16,face='bold'),
+        axis.text.x = element_text(size = 10,angle = 30,hjust = 0,color = 'red'))+
+  #ylim(NA,25)+ # NA is to give ggplot to decide the lower limit
+  facet_wrap(~Diet,scales='free_y',ncol = 1)
+```
 
