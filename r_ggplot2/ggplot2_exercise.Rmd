@@ -1,0 +1,107 @@
+---
+title: "r_ggplot2"
+author: "Jian"
+date: "24/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Exercise 1
+Install and Load the ggplot2 package
+```{r}
+renv::install('ggplot2')
+library(ggplot2)
+```
+
+Run ggplot(diamonds). Returns a grey box because no axis is specified
+```{r}
+ggplot(diamonds)
+```
+
+Specify the axies. Return a grid plot because no 'geom' is specified
+```{r}
+ggplot(diamonds, aes(x=carat, y=price))
+```
+
+Draw points showing carat on the x-axis and price on the y-axis
+```{r}
+ggplot(diamonds,aes(x=carat,y=price))+
+  geom_point()
+```
+
+Color data points by cut
+```{r}
+ggplot(diamonds,aes(x=carat,y=price,color=cut))+
+  geom_point()
+```
+This following code is doing the same thing as above but the color is only applied to the geom_point() function
+```{r}
+ggplot(diamonds,aes(x=carat,y=price))+
+  geom_point(aes(color=cut))
+```
+
+
+Add a smoothed mean trend line
+```{r}
+ggplot(diamonds,aes(x=carat,y=price))+
+  geom_point(aes(color=cut))+
+  geom_smooth(method='lm')
+```
+
+
+Exercise 2
+Plot a histogram of chick weight
+```{r}
+plot1_histogram <- ggplot(ChickWeight,aes(x=weight))+
+  geom_histogram(aes(fill=Diet),color='black',bins=50)+
+  labs(title='histogram of chick weight',
+       x='chick weight',
+       y='number of chicks',
+       subtitle = 'chick weight dataset by Diet')+
+  theme(axis.title = element_text(size=16,face='bold'),
+        axis.text.x = element_text(size = 10,angle = 30,hjust = 0,color = 'red'))+
+  #ylim(NA,25)+ # NA is to give ggplot to decide the lower limit
+  facet_wrap(~Diet,scales='free_y',ncol = 1)
+print(plot1_histogram)
+```
+
+Exercise 3
+Plot a scatter plot of chick weight over time
+```{r}
+plot2_scatter <- ggplot(ChickWeight,aes(x=Time,y=weight,color=Diet))+
+  geom_point()+
+  geom_smooth(method = 'lm')+
+  labs(title = 'Scatter plot of chick weight over time',y='chick weight')+
+  theme(axis.title = element_text(size = 15,face = 'bold'),
+        axis.text = element_text(size=10))
+print(plot2_scatter)
+```
+
+Use gridExtra to concatenate
+```{r}
+renv::install('gridExtra')
+library(gridExtra)
+```
+
+```{r}
+plot1_histogram_2 <- arrangeGrob(plot1_histogram,top = 'A') # Name plot1_histogram as 'A' and assign to plot1_histogram_2
+plot2_scatter_2 <- arrangeGrob(plot2_scatter,top = 'B') # Name plot2_scatter as 'B' and assign to plot1_scatter_2
+grid.arrange(plot1_histogram_2,plot2_scatter_2,ncol=2,nrow=1)
+```
+
+Use cowplot to concatenate
+```{r}
+renv::install('cowplot')
+library(cowplot)
+```
+
+
+```{r}
+plot_grid(plot1_histogram,plot2_scatter,labels = c('A','B'), ncol=2, nrow=1)
+```
+
+
+
