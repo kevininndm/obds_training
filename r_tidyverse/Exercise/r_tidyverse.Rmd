@@ -1,0 +1,241 @@
+---
+title: "r_tidyverse"
+author: "Jian"
+date: "25/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Restore the renv packages from the renv/lock file to install the packages
+```{r}
+renv::restore()
+```
+
+# Check the status of the renv
+```{r}
+renv::status()
+```
+
+# Load the tidyverse to check if the restore is working
+```{r}
+library(tidyverse)
+```
+# The Conficts above indicate that the filter() and lag() functions could be called by dplyr and stats, be cautious when call the filter() and lag() to make sure they are from the right library. Could use dplyr::filter() to specify the function from which library
+
+
+# Read the data
+```{r}
+counts_table <- read_tsv('Data/obds_countstable.tsv.gz')
+
+sample_table <- read_tsv('/Users/jluo/devel/obds_training/r_tidyverse/Exercise/Data/obds_sampletable.tsv')
+
+```
+
+# Tidy the count table: three columns - Geneid, sample, count
+```{r}
+counts_table_tidy <- counts_table %>%
+  pivot_longer(-Geneid,names_to = 'samples', values_to='count')
+```
+
+# Join with gene info to get mgi_symbol
+# Use the biomaRt package
+```{r}
+library(biomaRt)
+
+# To load the gene info database and select the one to be used by using the useMart function. And find the 'mmusculus_gene_ensembl'
+ensembl <- useMart("ensembl") # To read the database from biomRt
+listDatasets(ensembl) # To list the database and select the specific dataset to use
+ensembl <- useMart("ensembl",dataset="mmusculus_gene_ensembl") # Make the ensembl database again by just using the 'mmusculus_gene_ensembl' dataset
+
+# To access the list of the ensembleIDs for our geneIDs. And find the 'ensembl_gene_id' 'mgi_symbol'
+attributes = listAttributes(ensembl)
+attributes
+
+# To match ensembl_gene_id (from our table) to mgi_symbol from the database
+gene_names <- getBM(attributes=c('ensembl_gene_id', 'mgi_symbol'), 
+      filters = 'ensembl_gene_id', # If want the protein ID to be matched with gene ID,put 'ensembl_transcript_id'
+      values = counts_table$Geneid, 
+      mart = ensembl)
+View(gene_names)
+
+# To check if there are any duplicates in the gene_names table
+length(unique(gene_names$ensembl_gene_id))
+nrow(gene_names)
+
+
+# Join the counts_table_tidy and the gene_names by the ensembl_gene_id 
+counts_table_tidy <- counts_table_tidy %>%
+  left_join(gene_names,by=c('Geneid'='ensembl_gene_id'))
+
+# To check whether there are any NA in the mgi_symbol in the new counts_table_tidy
+# And to calculate the number of NA for each case 
+sum(is.na(counts_table_tidy$mgi_symbol))/12
+
+```
+
+## Tidy the sample_table
+```{r}
+# One variable per column
+sample_table_tidy <- sample_table %>%
+  separate(sample_title, c('gene_name','condition','cell_type','replicate_number'), sep = "_")
+View(sample_table_tidy)
+
+# Concatenate the column of 'gene_name' and 'condition' to one column
+# Drop the column of 'species' and 'library_layout'
+sample_table_tidy <- sample_table_tidy %>%
+  unite('genotype',gene_name:condition,sep = '_') %>%
+  dplyr::select(-species,-library_layout)
+View(sample_table_tidy)
+
+```
+
+
+## Join the sample_table_tidy to counts_table_tidy
+```{r}
+metadata_table <- counts_table_tidy %>%
+  left_join(sample_table_tidy,by=c('samples'='Sample_accession'))
+View(metadata_table)
+```
+
+
+## Calculate counts per million (CPM) for each gene
+# In the current metadata_table, the read_count is the total gene count for each sample
+```{r}
+metadata_table <- metadata_table %>%
+  mutate(CPM = count*1000000/read_count)
+View(metadata_table)
+```
+
+
+## Calculate log2(CPM+1)
+```{r}
+metadata_table <- metadata_table %>%
+  mutate(log_transformed = log2(CPM+1))
+View(metadata_table)
+```
+
+
+## This is to practice on how to calculate the total gene count for each sample
+# In the sample_table, there is already a column of total gene, so now we need to calculate this
+```{r}
+# Drop the columns of 'read_count', 'CPM', and 'log_transformed'
+metadata_table_2 <- metadata_table %>%
+  dplyr::select(Geneid:replicate_number)
+View (metadata_table_2)
+
+# Calculate the total gene count for each sample
+metadata_table_2 <- metadata_table_2 %>%
+  group_by(samples) %>%
+  mutate(total_counts=sum(count))
+View (metadata_table_2)
+
+# Calculate the CPM and log2(CPM+1)
+metadata_table_2 <- metadata_table_2 %>%
+  mutate(CPM = count*1000000/total_counts) %>%
+  mutate(log_transformed = log2(CPM+1))
+View(metadata_table_2)
+
+# The following is the same as the above to calculate the CPM and log2(CPM+1)
+#metadata_table_2 <- metadata_table_2 %>%
+ # mutate(CPM = count*1000000/total_counts, log_transformed = log2(CPM+1))
+```
+
+
+## Use summarise() to calculate the total gene counts but would only shown the same sample once
+```{r}
+plotting_table <- metadata_table_2 %>%
+  group_by(samples) %>%
+  summarise(total_counts=sum(count))
+View(plotting_table)
+```
+
+
+## Plot with ggplot using geom_col()
+```{r}
+plot1 <- ggplot(plotting_table,aes(x=samples,y=total_counts))+
+  geom_col(aes(fill=samples),color='black')+
+  labs(x='Samples',y='Total gene counts')+
+  theme(axis.text.x = element_text(angle = 45,hjust = 1),
+        axis.title = element_text(size=15,face='bold'))
+plot1
+```
+
+
+## How many genes have no counts for any sample?
+```{r}
+tem <- metadata_table_2 %>%
+  group_by(Geneid) %>%
+  summarise(total_counts_per_gene=sum(count)) %>%
+  filter(total_counts_per_gene==0) %>%
+  tally() #tally() is to count the number of rows in tidyverse
+View(tem)
+```
+
+
+## Draw a density plot of log2(CPM+1) for all genes
+# Use geom_density() and colour by sample
+```{r}
+plot2 <- ggplot(metadata_table_2,aes(x=log_transformed,color=samples))+
+  geom_density()
+plot2
+```
+
+## Filter out genes that have low expression in 3 or fewer samples
+# For low expression use CPM<0.5
+
+```{r}
+genes_to_keep <- metadata_table_2 %>%
+  group_by(Geneid) %>%
+  filter(CPM>=0.5) %>%
+  tally() %>%
+  filter(n>3) %>%
+  pull(var=Geneid) # to pull a specific column as a vector
+View(genes_to_keep)
+length(unique(genes_to_keep))
+
+metadata_table_2_filter <- metadata_table_2 %>%
+  filter(Geneid %in% genes_to_keep)
+View(metadata_table_2_filter)
+```
+
+# The following does the same thing as above
+```{r}
+tem_2 <- metadata_table_2 %>%
+  group_by(Geneid) %>%
+  filter(sum(CPM>=0.5)>3)
+View(tem_2)
+```
+
+
+## Make a density plot of log2(CPM+1) with the filtered data
+```{r}
+plot3 <- ggplot(metadata_table_2_filter,aes(x=log_transformed,color=samples))+
+  geom_density()
+plot3
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
